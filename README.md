@@ -8,4 +8,4 @@ for each of the 25 joints. Accordingly, every frame is represented by a 25*4 fea
 
 Make sure Tensorflow 1.3 is installed.
 
-To test the prototype simply run the model.py file.
+UPDATE: Currently reducing the size of training and testing files referenced by model.py.
