@@ -94,6 +94,13 @@ loss = tf.contrib.seq2seq.sequence_loss(logits=logits,
 # Optimizer
 train_step = tf.train.AdagradOptimizer(learning_rate).minimize(loss)
 
+# Accuracy calculation
+mask_as_int = tf.cast(sequence_mask,tf.int64)
+predictions_labels = tf.argmax(logits,2)
+_,accuracy = tf.metrics.accuracy(labels=labels,
+                                 predictions=predictions_labels,
+                                 weights=mask_as_int)
+
 with tf.Session() as sess:
     global_step = 0
     init_global = tf.global_variables_initializer()
@@ -110,12 +117,23 @@ with tf.Session() as sess:
     while True:
         try:
             global_step+=1
-            _, _loss = sess.run([train_step,loss],
+            _,_loss = sess.run([train_step,loss],
                                         feed_dict={handle:train_iterator_handle})
 
             if global_step % 125 == 0:
-                print 'Step: {}, Loss: {}'.format(global_step,_loss)
 
-        except tf.errors.OutOfRangeError:
+                sess.run(test_iterator.initializer)
+
+                # This loop iterates through the validation dataset.
+                while True:
+                    try:
+                        _acc = sess.run(accuracy,
+                                                feed_dict={handle:test_iterator_handle})
+
+                    except tf.errors.InvalidArgumentError:
+                        print 'Step:{}, Loss:{}, Accuracy:{}'.format(global_step,_loss,_acc)
+                        break
+
+        except tf.errors.InvalidArgumentError:
             print 'End of training dataset'
             break
