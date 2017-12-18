@@ -1,24 +1,14 @@
 import tensorflow as tf
 from tensorflow.python import debug as tf_debug
+from dataset import _parse_function
 
 batch_size = 20
-hidden_size = 300
+hidden_size = 400
 num_classes = 2
 learning_rate = 0.01
 padding_size = 300
 num_epochs = 100
 feature_size = 100
-
-def _parse_function(example_proto):
-    features = {"seq": tf.FixedLenFeature([], tf.string, default_value=""),
-              "label": tf.FixedLenFeature([], tf.int64, default_value=0),
-              "seq_len": tf.FixedLenFeature([], tf.int64, default_value=0)}
-
-    example = tf.parse_single_example(example_proto, features)
-    array_features = tf.decode_raw(example['seq'],tf.float64)
-    parsed_seq_len = example['seq_len']
-    parsed_label = example['label']
-    return array_features, parsed_label, parsed_seq_len
 
 # This section uses the Dataset API to iterate through a tfRecords dataset.
 # It iterates the dataset and applies tensor transformations to prepare the input
@@ -94,12 +84,29 @@ loss = tf.contrib.seq2seq.sequence_loss(logits=logits,
 # Optimizer
 train_step = tf.train.AdagradOptimizer(learning_rate).minimize(loss)
 
-# Accuracy calculation
-mask_as_int = tf.cast(sequence_mask,tf.int64)
-predictions_labels = tf.argmax(logits,2)
-_,accuracy = tf.metrics.accuracy(labels=labels,
-                                 predictions=predictions_labels,
-                                 weights=mask_as_int)
+with tf.name_scope('accuracy'):
+    mask_as_int = tf.cast(sequence_mask,tf.int64)
+    predictions_labels = tf.argmax(logits,2)
+    # real_labels = labels
+    # correct_prediction = tf.equal(predictions_labels,real_labels)
+    # real_correct_prediction = tf.cast(correct_prediction,tf.int64)*mask_as_int
+    # accuracy = tf.reduce_sum(tf.cast(real_correct_prediction,tf.float64)) /\
+    #             tf.reduce_sum(tf.cast(mask_as_int,tf.float64))
+
+    # This line is meant to extract the local variables associated with the accuracy.
+    # Accordingly, this allows us to reset them when one batch is completed
+    pred_vars = tf.contrib.framework.get_variables('accuracy', collection=tf.GraphKeys.LOCAL_VARIABLES)
+
+    _,accuracy = tf.metrics.accuracy(labels=labels,
+                                     predictions=predictions_labels,
+                                     weights=mask_as_int)
+
+# Summaries collected for tensorboard.
+with tf.name_scope('summaries'):
+    acc_summary = tf.summary.scalar('acc',accuracy)
+    loss_summary = tf.summary.scalar('loss',loss)
+    hidden_summary = tf.summary.histogram('hidden_states',outputs)
+    merge_during_train = tf.summary.merge([loss_summary,hidden_summary])
 
 with tf.Session() as sess:
     global_step = 0
@@ -113,27 +120,38 @@ with tf.Session() as sess:
     train_iterator_handle = sess.run(train_iterator.string_handle())
     test_iterator_handle = sess.run(test_iterator.string_handle())
 
+    writer = tf.summary.FileWriter('./graphs/hs_{}/'.format(hidden_size), sess.graph)
+
+    # This runs the debugger
+    # sess = tf_debug.LocalCLIDebugWrapperSession(sess)
+    # sess.add_tensor_filter("has_inf_or_nan", tf_debug.has_inf_or_nan)
+
     # This loop iterates through the training dataset.
     while True:
         try:
             global_step+=1
-            _,_loss = sess.run([train_step,loss],
+            _,summary_train = sess.run([train_step,merge_during_train],
                                         feed_dict={handle:train_iterator_handle})
 
             if global_step % 125 == 0:
+                print 'Step: {}'.format(global_step)
 
+                # This resets the local variables associatted with the acc counter
+                sess.run(pred_vars)
                 sess.run(test_iterator.initializer)
 
                 # This loop iterates through the validation dataset.
                 while True:
                     try:
-                        _acc = sess.run(accuracy,
+                        summary_test = sess.run(acc_summary,
                                                 feed_dict={handle:test_iterator_handle})
-
-                    except tf.errors.InvalidArgumentError:
-                        print 'Step:{}, Loss:{}, Accuracy:{}'.format(global_step,_loss,_acc)
+                    except tf.errors.InvalidArgumentError, tf.errors.OutOfRangeError:
+                        print 'End of validation dataset'
+                        writer.add_summary(summary_train,global_step)
+                        writer.add_summary(summary_test,global_step)
                         break
 
-        except tf.errors.InvalidArgumentError:
+        except tf.errors.InvalidArgumentError, tf.errors.OutOfRangeError:
             print 'End of training dataset'
+            writer.close()
             break
