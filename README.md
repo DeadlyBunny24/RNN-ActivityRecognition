@@ -11,18 +11,18 @@ The inspiration of this architectures lies in:
 As a first experiment, the network is tested on recognizing the activities on a video, since this task exhibits lengthy sequences and has practical value. poster_V_2.pdf has an overview of the proposal and thesis_V_6_es.pdf elborates on the intuitions.
 
 # Results
-The following video shows that DRNN achieves similar performance to an LSTM (Popular architecture to deal with the sensibility of inputs) but with 98% less parameters.  DRNN is then a plausible architecture when performance could be sacrificed for model size. 
+The following video shows that DRNN achieves similar performance to an LSTM (Popular architecture to deal with the sensibility of inputs) but with 98% less parameters.  DRNN is then a plausible architecture when performance could be sacrificed for model size. <b>Click image below ↓ to see video.</b>
 
 <a href="http://www.youtube.com/watch?feature=player_embedded&v=piEGvbbbbps
-" target="_blank"><img src="http://img.youtube.com/vi/piEGvbbbbps/0.jpg" 
-width="240" height="180" border="10" /></a>
+" target="_blank"><img src="https://image.ibb.co/b6TTRK/youtube_thumbnail_2play.png" 
+border="10" /></a>
 
 # Future work ideas:
 - Validate if DRNN is indeed expanding the input domain the output is sensible to.
 - Compare DRNN to similar architectures (e.g. NARX RNNs).
 - Making the delay of the units a trainable parameter.
 
-# How to train my model with DRNN?
+# How to train a DRNN model?
 See documentation.pdf
 
 # Neural Networks and TensorFlow Tutorial
